@@ -36,19 +36,30 @@ interface IChatHandler {
 }
 
 /**
- * Entree du fichier de config du flux de validation "Chat Games »" (spec AutoResponder).
- * trigger est cherche en sous-chaine du message (apres le prefixe), mindelay/maxdelay en ms.
+ * Distingue, dans le fichier unique autoresponder_questions.json, quel handler/mecanisme de
+ * matching une entree alimente : /ar addtrigger (substring sur "Chat Games » ..."),
+ * /ar addquestion (banque "Answer the following question: ...") ou /ar add (unscramble,
+ * matching par anagramme, pas par texte litteral).
+ */
+enum class QuestionKind { CHATGAMES, QUESTION, UNSCRAMBLE }
+
+/**
+ * Entree unique du fichier de config, alimentee par /ar add, /ar addquestion et /ar addtrigger
+ * (kind distingue le mecanisme). Pour CHATGAMES, trigger est cherche en sous-chaine du message
+ * (apres le prefixe "Chat Games »"). mindelay/maxdelay en ms.
  */
 data class ValidationQuestion(
     val trigger: String,
     val response: String,
     val mindelay: Long = 1000,
-    val maxdelay: Long = 2000
+    val maxdelay: Long = 2000,
+    val kind: QuestionKind = QuestionKind.CHATGAMES
 )
 
 /**
- * Fichier de config complet : gabarit de commande + liste des questions.
- * commandTemplate accepte les placeholders {response} et {timer}.
+ * Fichier de config complet : gabarit de commande (flux Chat Games uniquement) + liste unique
+ * des entrees apprises par /ar add / addquestion / addtrigger. commandTemplate accepte les
+ * placeholders {response} et {timer}.
  */
 data class ValidationConfigFile(
     val commandTemplate: String = "/cg valid {response} | {timer}",

@@ -26,22 +26,23 @@ class FirstToSayHandler : IChatHandler {
 
 /**
  * "Unscramble abc" -> mot du dictionnaire dont les lettres triees correspondent.
+ * Delai par entree (mindelay/maxdelay), 800/1400ms par defaut pour le dictionnaire de base.
  */
-class UnscrambleHandler(words: List<String>, learned: Map<String, String>) : IChatHandler {
+class UnscrambleHandler(words: List<String>, learned: List<ValidationQuestion>) : IChatHandler {
 
     private val regex = Regex("""unscramble[:\s]+([A-Za-z]+)""", RegexOption.IGNORE_CASE)
-    private val byLetters: Map<String, String> = buildMap {
+    private val byLetters: Map<String, ValidationQuestion> = buildMap {
         for (word in words) {
             val key = sortedLetters(word)
-            if (key.isNotEmpty()) putIfAbsent(key, word)
+            if (key.isNotEmpty()) putIfAbsent(key, ValidationQuestion(word, word, 800, 1400, QuestionKind.UNSCRAMBLE))
         }
-        putAll(learned) // les paires apprises via /cg add priment sur le dico
+        for (entry in learned) put(sortedLetters(entry.trigger), entry) // apprises priment sur le dico
     }
 
     override fun handle(text: String): Response? {
         val scrambled = regex.find(text)?.groupValues?.get(1) ?: return null
-        val answer = byLetters[sortedLetters(scrambled)] ?: return null
-        return Response(answer, 800, 1400)
+        val entry = byLetters[sortedLetters(scrambled)] ?: return null
+        return Response(entry.response, entry.mindelay, entry.maxdelay)
     }
 }
 
@@ -71,15 +72,16 @@ class MathHandler : IChatHandler {
 
 /**
  * "Answer the following question: ..." -> reponse issue de la banque configurable.
+ * Delai par entree (mindelay/maxdelay), 800/1400ms par defaut.
  */
-class QuestionHandler(private val answers: Map<String, String>) : IChatHandler {
+class QuestionHandler(private val answers: Map<String, ValidationQuestion>) : IChatHandler {
 
     private val regex = Regex("""answer the following question:\s*(.+)""", RegexOption.IGNORE_CASE)
 
     override fun handle(text: String): Response? {
         val question = regex.find(text)?.groupValues?.get(1) ?: return null
-        val answer = answers[normalizeQuestion(question)] ?: return null
-        return Response(answer, 800, 1400)
+        val entry = answers[normalizeQuestion(question)] ?: return null
+        return Response(entry.response, entry.mindelay, entry.maxdelay)
     }
 }
 
@@ -130,9 +132,13 @@ class ChatGamesValidationHandler(
         return Response(command, delay, delay, isCommand = true, delayResolved = true)
     }
 
-    /** Message ephemere cote client uniquement (actionbar), jamais envoye au serveur. */
+    /**
+     * Message ephemere dans le chat, cote client uniquement (jamais envoye au serveur).
+     * sendSystemMessage plutot que l'actionbar : un serveur de chat games spamme deja
+     * l'actionbar (timers, XP...), qui ecraserait notre notice avant qu'elle soit lue.
+     */
     private fun notifyLocally() {
-        Minecraft.getInstance().player?.sendOverlayMessage(
+        Minecraft.getInstance().player?.sendSystemMessage(
             Component.literal("§7[AutoResponder] §fReponse trouvee ! Envoi automatique programme.")
         )
     }

@@ -25,13 +25,14 @@ dependencies {
     implementation("net.fabricmc:fabric-language-kotlin:${property("fabric_kotlin_version")}")
 
     // Menu de config : requis (l'ecran /cg config et le menu ModMenu en dependent directement).
-    modImplementation("dev.isxander:yet-another-config-lib:${property("yacl_version")}")
+    // Ce setup Loom saute le remapping (26.x deja en noms Mojang) donc pas de configurations
+    // "mod*" (elles servent a marquer ce qui doit etre remappe) : implementation classique,
+    // comme fabric-api/fabric-language-kotlin ci-dessus.
+    implementation("dev.isxander:yet-another-config-lib:${property("yacl_version")}")
 
-    // ModMenu : optionnel. compileOnly pour compiler contre l'API, localRuntime pour le tester
-    // avec `gradlew.bat runClient` ; absent de la liste "depends" du fabric.mod.json donc le mod
-    // charge normalement sans ModMenu installe (l'entrypoint "modmenu" n'est alors jamais lu).
-    modCompileOnly("com.terraformersmc:modmenu:${property("modmenu_version")}")
-    modLocalRuntime("com.terraformersmc:modmenu:${property("modmenu_version")}")
+    // ModMenu : optionnel, compileOnly seulement -> pas requis au runtime pour les joueurs qui
+    // n'ont pas ModMenu (l'entrypoint "modmenu" du fabric.mod.json n'est alors jamais lu).
+    compileOnly("com.terraformersmc:modmenu:${property("modmenu_version")}")
 }
 
 tasks.processResources {

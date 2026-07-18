@@ -2,21 +2,43 @@ package pro.letrip.autoresponder
 
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
+import com.google.gson.JsonDeserializer
 import com.google.gson.reflect.TypeToken
 import net.fabricmc.loader.api.FabricLoader
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import kotlin.io.path.exists
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
 
 /**
- * Charge la config depuis <configDir>/autochatgames/, en copiant les defauts
- * embarques au premier lancement. Reconstruit la chaine de handlers a chaque reload.
+ * Charge la config depuis <configDir>/autoresponder/, en copiant les defauts embarques au
+ * premier lancement. Reconstruit la chaine de handlers a chaque reload.
+ *
+ * Stockage unifie : /ar add, /ar addquestion et /ar addtrigger ecrivent tous les trois dans
+ * autoresponder_questions.json (une seule liste de ValidationQuestion, distinguee par kind).
  */
 object Config {
 
-    private val gson: Gson = GsonBuilder().setPrettyPrinting().create()
+    // Gson (standard, pas kotlinx-serialization) ignore les defauts de constructeur Kotlin pour
+    // les champs absents du JSON : un ancien autoresponder_questions.json sans "kind" produirait
+    // un kind=null (bypass du constructeur via Unsafe), pas QuestionKind.CHATGAMES comme attendu.
+    // D'ou ce deserializer explicite, plutot que compter sur le defaut du data class.
+    private val gson: Gson = GsonBuilder()
+        .setPrettyPrinting()
+        .registerTypeAdapter(ValidationQuestion::class.java, JsonDeserializer { json, _, _ ->
+            val obj = json.asJsonObject
+            ValidationQuestion(
+                trigger = obj.get("trigger")?.asString.orEmpty(),
+                response = obj.get("response")?.asString.orEmpty(),
+                mindelay = obj.get("mindelay")?.asLong ?: 1000,
+                maxdelay = obj.get("maxdelay")?.asLong ?: 2000,
+                kind = obj.get("kind")?.asString?.let { runCatching { QuestionKind.valueOf(it) }.getOrNull() }
+                    ?: QuestionKind.CHATGAMES
+            )
+        })
+        .create()
     private val dir: Path = FabricLoader.getInstance().configDir.resolve("autoresponder")
 
     var enabled: Boolean = true
@@ -33,6 +55,10 @@ object Config {
     lateinit var validationHandler: ChatGamesValidationHandler
         private set
 
+    /** Dernier contenu charge de autoresponder_questions.json (source pour l'ecran de config). */
+    lateinit var validationConfig: ValidationConfigFile
+        private set
+
     fun load() {
         Files.createDirectories(dir)
 
@@ -40,53 +66,102 @@ object Config {
         val responders = gson.fromJson(read("responders.json"), Array<Responder>::class.java).toList()
         val rawQuestions: Map<String, String> =
             gson.fromJson(read("questions.json"), object : TypeToken<Map<String, String>>() {}.type)
-        val questions = buildMap {
-            for ((q, a) in rawQuestions) put(normalizeQuestion(q), a)
-            for ((q, a) in readLearnedQuestions()) put(normalizeQuestion(q), a) // apprises priment
-        }
-        val validationConfig = gson.fromJson(read("autoresponder_questions.json"), ValidationConfigFile::class.java)
+
+        var loaded = gson.fromJson(read("autoresponder_questions.json"), ValidationConfigFile::class.java)
             ?: ValidationConfigFile()
+        loaded = migrateLegacyFilesIfPresent(loaded)
+        validationConfig = loaded
 
         val settings = readSettings()
         enabled = settings.enabled
         baseCooldownMs = settings.baseCooldownMs
 
+        val questionEntries = validationConfig.questions.filter { it.kind == QuestionKind.QUESTION }
+        val questions = buildMap {
+            for ((q, a) in rawQuestions) put(normalizeQuestion(q), ValidationQuestion(q, a, 800, 1400, QuestionKind.QUESTION))
+            for (vq in questionEntries) put(normalizeQuestion(vq.trigger), vq) // apprises priment
+        }
+        val unscrambleEntries = validationConfig.questions.filter { it.kind == QuestionKind.UNSCRAMBLE }
+        val chatGamesEntries = validationConfig.questions.filter { it.kind == QuestionKind.CHATGAMES }
+
         handlers = listOf(
             FirstToSayHandler(),
-            UnscrambleHandler(words, readLearned()),
+            UnscrambleHandler(words, unscrambleEntries),
             MathHandler(),
             QuestionHandler(questions),
             StaticResponderHandler(responders)
         )
-        validationHandler = ChatGamesValidationHandler(validationConfig.questions, validationConfig.commandTemplate)
+        validationHandler = ChatGamesValidationHandler(chatGamesEntries, validationConfig.commandTemplate)
     }
 
-    /** Apprend une paire scramble -> reponse, la persiste et recharge. */
-    fun addUnscramble(scrambled: String, answer: String) {
-        val learned = readLearned().toMutableMap()
-        learned[sortedLetters(scrambled)] = answer
-        learnedFile.writeText(gson.toJson(learned))
+    /** Ecrase autoresponder_questions.json (gabarit + liste complete, tous kinds) et recharge. Utilise par l'ecran de config. */
+    fun saveValidationConfig(commandTemplate: String, questions: List<ValidationQuestion>) {
+        val file = ValidationConfigFile(commandTemplate, questions)
+        dir.resolve("autoresponder_questions.json").writeText(gson.toJson(file))
         load()
     }
 
-    /** Apprend une reponse a une question, la persiste et recharge. */
-    fun addQuestion(question: String, answer: String) {
-        val learned = readLearnedQuestions().toMutableMap()
-        learned[question] = answer
-        learnedQuestionsFile.writeText(gson.toJson(learned))
-        load()
+    /** Point d'entree unique de /ar add <kind> : ajoute (ou remplace si meme trigger/kind) et persiste. */
+    fun addEntry(trigger: String, response: String, mindelay: Long, maxdelay: Long, kind: QuestionKind) =
+        upsert(ValidationQuestion(trigger, response, mindelay, maxdelay, kind))
+
+    /** Cle de dedup par kind : substring litteral (chatgames), question normalisee, ou anagramme. */
+    private fun matchKey(q: ValidationQuestion): String = when (q.kind) {
+        QuestionKind.CHATGAMES -> q.trigger.lowercase()
+        QuestionKind.QUESTION -> normalizeQuestion(q.trigger)
+        QuestionKind.UNSCRAMBLE -> sortedLetters(q.trigger)
+    }
+
+    private fun upsert(entry: ValidationQuestion) {
+        val key = matchKey(entry)
+        val updated = validationConfig.questions.filterNot { it.kind == entry.kind && matchKey(it) == key } + entry
+        saveValidationConfig(validationConfig.commandTemplate, updated)
     }
 
     private val learnedFile: Path get() = dir.resolve("learned.json")
     private val learnedQuestionsFile: Path get() = dir.resolve("learned_questions.json")
 
-    private fun readLearned(): Map<String, String> = readMap(learnedFile)
-    private fun readLearnedQuestions(): Map<String, String> = readMap(learnedQuestionsFile)
+    /**
+     * Anciens fichiers separes (learned.json / learned_questions.json, d'avant le stockage
+     * unifie) : import ponctuel dans autoresponder_questions.json puis renommage en .migrated
+     * pour ne pas les reimporter au prochain load(). Couvre l'ancien format Map<String,String>
+     * (lettres/question -> reponse) et le format liste intermediaire (avec mindelay/maxdelay).
+     */
+    private fun migrateLegacyFilesIfPresent(current: ValidationConfigFile): ValidationConfigFile {
+        val legacyUnscramble = readLegacyEntries(learnedFile, QuestionKind.UNSCRAMBLE)
+        val legacyQuestions = readLegacyEntries(learnedQuestionsFile, QuestionKind.QUESTION)
+        if (legacyUnscramble.isEmpty() && legacyQuestions.isEmpty()) return current
 
-    private fun readMap(file: Path): Map<String, String> {
-        if (!file.exists()) return emptyMap()
-        return gson.fromJson(file.readText(), object : TypeToken<Map<String, String>>() {}.type)
-            ?: emptyMap()
+        val migrated = ValidationConfigFile(current.commandTemplate, current.questions + legacyUnscramble + legacyQuestions)
+        dir.resolve("autoresponder_questions.json").writeText(gson.toJson(migrated))
+
+        if (learnedFile.exists()) {
+            Files.move(learnedFile, dir.resolve("learned.json.migrated"), StandardCopyOption.REPLACE_EXISTING)
+        }
+        if (learnedQuestionsFile.exists()) {
+            Files.move(learnedQuestionsFile, dir.resolve("learned_questions.json.migrated"), StandardCopyOption.REPLACE_EXISTING)
+        }
+        return migrated
+    }
+
+    private fun readLegacyEntries(file: Path, kind: QuestionKind): List<ValidationQuestion> {
+        if (!file.exists()) return emptyList()
+        val text = file.readText()
+        return try {
+            val listType = object : TypeToken<List<Map<String, Any>>>() {}.type
+            val raw: List<Map<String, Any>> = gson.fromJson(text, listType) ?: emptyList()
+            raw.mapNotNull { obj ->
+                val trigger = (obj["question"] ?: obj["scrambled"])?.toString() ?: return@mapNotNull null
+                val answer = obj["answer"]?.toString() ?: return@mapNotNull null
+                val mindelay = (obj["mindelay"] as? Double)?.toLong() ?: 800
+                val maxdelay = (obj["maxdelay"] as? Double)?.toLong() ?: 1400
+                ValidationQuestion(trigger, answer, mindelay, maxdelay, kind)
+            }
+        } catch (e: Exception) {
+            val map: Map<String, String> = gson.fromJson(text, object : TypeToken<Map<String, String>>() {}.type)
+                ?: emptyMap()
+            map.map { (k, v) -> ValidationQuestion(k, v, 800, 1400, kind) }
+        }
     }
 
     fun setEnabled(value: Boolean) {
