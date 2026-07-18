@@ -2,7 +2,6 @@ package pro.letrip.autoresponder
 
 import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.Component
-import kotlin.random.Random
 
 /** Cle normalisee d'une question (minuscule, sans ponctuation, espaces compresses). */
 fun normalizeQuestion(question: String): String =
@@ -118,11 +117,8 @@ class ChatGamesValidationHandler(
     override fun handle(text: String): Response? {
         val entry = questions.firstOrNull { text.contains(it.trigger, ignoreCase = true) } ?: return null
 
-        val delay = if (entry.maxdelay <= entry.mindelay) {
-            entry.mindelay
-        } else {
-            Random.nextLong(entry.mindelay, entry.maxdelay + 1)
-        }
+        // Resolu ici (cooldown de base inclus) pour que {timer} corresponde exactement au delai reel.
+        val delay = MessageScheduler.resolveDelay(entry.mindelay, entry.maxdelay)
 
         notifyLocally()
 
@@ -131,8 +127,7 @@ class ChatGamesValidationHandler(
             .replace("{timer}", delay.toString())
             .removePrefix("/")
 
-        // min == max -> MessageScheduler enverra exactement ce delai, coherent avec {timer}.
-        return Response(command, delay, delay, isCommand = true)
+        return Response(command, delay, delay, isCommand = true, delayResolved = true)
     }
 
     /** Message ephemere cote client uniquement (actionbar), jamais envoye au serveur. */

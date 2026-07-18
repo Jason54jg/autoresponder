@@ -3,12 +3,16 @@ package pro.letrip.autoresponder
 /**
  * Une reponse prete a envoyer, avec sa fenetre de delai aleatoire.
  * isCommand = true -> envoye via sendCommand (sans le "/").
+ * delayResolved = true -> minDelayMs/maxDelayMs sont deja identiques et definitifs (cooldown de
+ * base deja inclus), utilise quand le delai doit etre connu a l'avance (ex: texte de commande
+ * qui affiche le timer). Sinon MessageScheduler tire aleatoirement et ajoute le cooldown de base.
  */
 data class Response(
     val message: String,
     val minDelayMs: Long,
     val maxDelayMs: Long,
-    val isCommand: Boolean = false
+    val isCommand: Boolean = false,
+    val delayResolved: Boolean = false
 )
 
 /**

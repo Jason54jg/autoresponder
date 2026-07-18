@@ -15,12 +15,18 @@ object MessageScheduler {
     private val queue = ConcurrentLinkedQueue<Pending>()
 
     fun submit(response: Response) {
-        val delay = if (response.maxDelayMs <= response.minDelayMs) {
+        val delay = if (response.delayResolved) {
             response.minDelayMs
         } else {
-            Random.nextLong(response.minDelayMs, response.maxDelayMs + 1)
+            resolveDelay(response.minDelayMs, response.maxDelayMs)
         }
         queue.add(Pending(System.currentTimeMillis() + delay, response.message, response.isCommand))
+    }
+
+    /** Tire un delai aleatoire dans [minMs, maxMs] et y ajoute le cooldown de base configurable. */
+    fun resolveDelay(minMs: Long, maxMs: Long): Long {
+        val random = if (maxMs <= minMs) minMs else Random.nextLong(minMs, maxMs + 1)
+        return random + Config.baseCooldownMs
     }
 
     fun tick(client: Minecraft) {

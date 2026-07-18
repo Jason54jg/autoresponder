@@ -22,6 +22,10 @@ object Config {
     var enabled: Boolean = true
         private set
 
+    /** Delai (ms) ajoute a chaque reponse programmee, en plus du mindelay/maxdelay propre a l'entree. */
+    var baseCooldownMs: Long = 2000
+        private set
+
     lateinit var handlers: List<IChatHandler>
         private set
 
@@ -43,7 +47,9 @@ object Config {
         val validationConfig = gson.fromJson(read("autoresponder_questions.json"), ValidationConfigFile::class.java)
             ?: ValidationConfigFile()
 
-        enabled = readSettings().enabled
+        val settings = readSettings()
+        enabled = settings.enabled
+        baseCooldownMs = settings.baseCooldownMs
 
         handlers = listOf(
             FirstToSayHandler(),
@@ -85,10 +91,16 @@ object Config {
 
     fun setEnabled(value: Boolean) {
         enabled = value
-        saveSettings(Settings(value))
+        saveSettings(Settings(enabled, baseCooldownMs))
     }
 
-    private data class Settings(val enabled: Boolean = true)
+    /** Change le cooldown de base (ms), borne a [0, 10000] pour eviter une config absurde. */
+    fun setBaseCooldownMs(value: Long) {
+        baseCooldownMs = value.coerceIn(2000, 10000)
+        saveSettings(Settings(enabled, baseCooldownMs))
+    }
+
+    private data class Settings(val enabled: Boolean = true, val baseCooldownMs: Long = 500)
 
     private fun readSettings(): Settings {
         val file = dir.resolve("settings.json")

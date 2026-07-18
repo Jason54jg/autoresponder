@@ -12,6 +12,8 @@ base {
 
 repositories {
     maven("https://maven.fabricmc.net/") { name = "Fabric" }
+    maven("https://maven.isxander.dev/releases") { name = "isxander" }
+    maven("https://maven.terraformersmc.com/releases/") { name = "TerraformersMC" }
 }
 
 dependencies {
@@ -21,6 +23,15 @@ dependencies {
 
     implementation("net.fabricmc.fabric-api:fabric-api:${property("fabric_version")}")
     implementation("net.fabricmc:fabric-language-kotlin:${property("fabric_kotlin_version")}")
+
+    // Menu de config : requis (l'ecran /cg config et le menu ModMenu en dependent directement).
+    modImplementation("dev.isxander:yet-another-config-lib:${property("yacl_version")}")
+
+    // ModMenu : optionnel. compileOnly pour compiler contre l'API, localRuntime pour le tester
+    // avec `gradlew.bat runClient` ; absent de la liste "depends" du fabric.mod.json donc le mod
+    // charge normalement sans ModMenu installe (l'entrypoint "modmenu" n'est alors jamais lu).
+    modCompileOnly("com.terraformersmc:modmenu:${property("modmenu_version")}")
+    modLocalRuntime("com.terraformersmc:modmenu:${property("modmenu_version")}")
 }
 
 tasks.processResources {

@@ -13,12 +13,22 @@
                 "adapter": "kotlin",
                 "value": "pro.letrip.autoresponder.AutoResponder"
             }
+        ],
+        "modmenu": [
+            {
+                "adapter": "kotlin",
+                "value": "pro.letrip.autoresponder.ModMenuIntegration"
+            }
         ]
     },
     "depends": {
         "fabricloader": ">=0.16.0",
         "fabric-language-kotlin": "*",
         "fabric-api": "*",
+        "yet_another_config_lib_v3": ">=3.9.5",
         "minecraft": "*"
+    },
+    "recommends": {
+        "modmenu": ">=18.0.0"
     }
 }
