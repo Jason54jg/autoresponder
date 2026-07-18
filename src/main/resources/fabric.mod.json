@@ -1,0 +1,24 @@
+{
+    "schemaVersion": 1,
+    "id": "autoresponder",
+    "version": "${version}",
+    "name": "AutoResponder",
+    "description": "Repond automatiquement aux chat games (Chat Games » via validation de commande, unscramble, maths, first-to-say, questions).",
+    "authors": ["letrip"],
+    "license": "MIT",
+    "environment": "client",
+    "entrypoints": {
+        "client": [
+            {
+                "adapter": "kotlin",
+                "value": "pro.letrip.autoresponder.AutoResponder"
+            }
+        ]
+    },
+    "depends": {
+        "fabricloader": ">=0.16.0",
+        "fabric-language-kotlin": "*",
+        "fabric-api": "*",
+        "minecraft": "*"
+    }
+}
