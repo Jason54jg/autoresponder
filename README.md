@@ -1,36 +1,38 @@
 # AutoResponder
 
-Mod Fabric (client) qui répond **automatiquement** aux chat games du serveur (anciennement *autochatgames*).
+🌐 **English** · [Français](README.fr.md)
+
+Fabric (client-side) mod that **automatically answers** a server's chat games (formerly *autochatgames*).
 
 ## Installation
 
-Dans `.minecraft/mods/`, mets 3 jars :
+Put 3 jars in `.minecraft/mods/`:
 
-1. Le mod : `autoresponder-<version>+<mc>.jar` (ex. `autoresponder-1.1.1+26.3.jar`)
+1. The mod: `autoresponder-<version>+<mc>.jar` (e.g. `autoresponder-1.1.4+26.3.jar`)
 2. **Fabric API**
 3. **Fabric Language Kotlin**
 
-Versions Minecraft supportées : **26.1.2, 26.2, 26.3** (JDK 25). Prends le jar qui correspond à ta version. Historique des versions : [CHANGELOG.md](CHANGELOG.md).
+Supported Minecraft versions: **26.1.2, 26.2, 26.3** (JDK 25). Use the jar that matches your version. Version history: [CHANGELOG.md](CHANGELOG.md).
 
-Langues : le mod suit la langue de Minecraft (anglais, français, espagnol, allemand ; autre langue = anglais). Pour en ajouter une, copie `src/main/resources/assets/autoresponder/lang/en_us.json` en `<code_langue>.json` et traduis.
+Languages: the mod follows Minecraft's language (English, French, Spanish, German; any other language falls back to English). To add one, copy `src/main/resources/assets/autoresponder/lang/en_us.json` to `<language_code>.json` and translate it.
 
-Écran de config maison (pas de dépendance externe). **ModMenu** est optionnel : mets-le dans `mods/` si tu veux l'entrée "AutoResponder" dans son menu, sinon utilise `/ar`.
+Custom config screen (no external dependency). **ModMenu** is optional: drop it in `mods/` if you want an "AutoResponder" entry in its menu, otherwise use `/ar`.
 
-## Flux "Chat Games »" (validation par commande)
+## "Chat Games »" flow (validation by command)
 
-Quand un message reçu commence **exactement** par `Chat Games »` (espaces/retours à la ligne autour ignorés — certains serveurs paddent le message) :
+When a received message starts **exactly** with `Chat Games »` (surrounding spaces/newlines are ignored — some servers pad the message):
 
-1. Le mod analyse le reste du message et cherche une entrée correspondante dans `autoresponder_questions.json`.
-2. Si trouvée : affiche une notice **locale côté client** (jamais envoyée au serveur, style configurable — voir plus bas) :
-   `[AutoResponder] Réponse trouvée ! Envoi automatique programmé.`
-   Puis, après un délai aléatoire tiré entre `mindelay` et `maxdelay` (ms), envoie la commande de validation configurée au serveur, par ex. `/cg valid Rebirth | 1532`.
-3. Si **aucune** entrée ne correspond : notice locale `[AutoResponder] aucune reponse connue pour ce Chat Games, reponds toi-meme !` — rien n'est envoyé au serveur, à toi de répondre à la main.
+1. The mod analyses the rest of the message and looks for a matching entry in `autoresponder_questions.json`.
+2. If found: shows a **client-side local** notice (never sent to the server, configurable style — see below):
+   `[AutoResponder] Answer found! Automatic reply scheduled.`
+   Then, after a random delay picked between `mindelay` and `maxdelay` (ms), sends the configured validation command to the server, e.g. `/cg valid Rebirth | 1532`.
+3. If **no** entry matches: local notice `[AutoResponder] No known answer for this Chat Games, answer it yourself!` — nothing is sent to the server, it's up to you to answer by hand.
 
-Aucune réponse publique instantanée n'est jamais envoyée pour ces messages, dans un cas comme dans l'autre.
+The notice text follows Minecraft's language. No instant public answer is ever sent for these messages, in either case.
 
-`/cg valid ...` (ou `/chatgame valid ...`) est la commande du **plugin du serveur**, envoyée automatiquement en arrière-plan (`connection.sendCommand`, ne passe pas par le chat local). Elle n'apparaît pas dans le tab-complete de nos commandes `/ar` — normal, ce n'est pas une commande à nous, et si le serveur ne l'a pas déclarée dans son propre arbre Brigadier, elle n'apparaîtra pas non plus au tab-complete général du jeu. Rien à faire côté mod.
+`/cg valid ...` (or `/chatgame valid ...`) is the **server plugin's** command, sent automatically in the background (`connection.sendCommand`, it does not go through the local chat). It does not show up in tab-complete for our `/ar` commands — that's expected, it is not our command, and if the server did not declare it in its own Brigadier tree it won't show up in the game's general tab-complete either. Nothing to do on the mod side.
 
-### Config `autoresponder_questions.json`
+### `autoresponder_questions.json` config
 
 ```json
 {
@@ -46,69 +48,69 @@ Aucune réponse publique instantanée n'est jamais envoyée pour ces messages, d
 }
 ```
 
-- `trigger` : sous-chaîne cherchée dans le message (après le préfixe `Chat Games »`).
-- `response` : valeur injectée dans `{response}`.
-- `mindelay` / `maxdelay` : bornes en millisecondes du délai aléatoire avant envoi (s'ajoute au **cooldown de base**, voir écran de config).
-- `commandTemplate` : gabarit de la commande finale. Placeholders `{response}` et `{timer}` (délai réellement tiré, en ms — cooldown de base inclus). Change-le en `/chatgame valid {response} | {timer}` si besoin.
+- `trigger`: substring searched in the message (after the `Chat Games »` prefix).
+- `response`: value injected into `{response}`.
+- `mindelay` / `maxdelay`: bounds, in milliseconds, of the random delay before sending (added on top of the **base cooldown**, see the config screen).
+- `commandTemplate`: template of the final command. Placeholders `{response}` and `{timer}` (the delay actually drawn, in ms — base cooldown included). Change it to `/chatgame valid {response} | {timer}` if needed.
 
-## Autres solveurs (messages sans préfixe "Chat Games »")
+## Other solvers (messages without the "Chat Games »" prefix)
 
-| Type de message | Réponse |
+| Message type | Answer |
 |---|---|
-| `First one to say X` | renvoie `X` |
-| `Unscramble abc` | trouve le mot (dictionnaire `words.txt`) |
-| `What is 9 x 6?` | calcule → `54` |
-| `Answer the following question: ...` | banque de réponses (`questions.json`) |
-| entrées de `responders.json` | réponse fixe configurée |
+| `First one to say X` | replies `X` |
+| `Unscramble abc` | finds the word (`words.txt` dictionary) |
+| `What is 9 x 6?` | computes → `54` |
+| `Answer the following question: ...` | answer bank (`questions.json`) |
+| entries of `responders.json` | configured fixed answer |
 
-Réponse envoyée dans le **chat public**, délai fixe 800-1400ms + cooldown de base. Ce chemin ne s'applique qu'aux messages qui ne commencent **pas** par `Chat Games »`. Purement statique (fichiers de ressources) — pas de commande pour y ajouter des entrées, seul `/ar add` (flux Chat Games) est disponible.
+The answer is sent in the **public chat**, fixed delay 800-1400 ms + base cooldown. This path only applies to messages that do **not** start with `Chat Games »`. Purely static (resource files) — there is no command to add entries to it, only `/ar add` (Chat Games flow) is available.
 
-## Commandes (`/ar` ou `/autoresponder`)
+## Commands (`/ar` or `/autoresponder`)
 
-**Important : ce ne sont PAS les mêmes commandes que `/cg valid ...` / `/chatgame valid ...`.** Celles-ci sont celles du **plugin du serveur** (voir `commandTemplate` plus haut), notre mod les envoie automatiquement en arrière-plan sans passer par le chat. Le mod utilise volontairement un préfixe différent (`/ar`) pour ne jamais entrer en collision avec elles — si notre mod enregistrait aussi `/cg` comme commande client, taper `/cg valid ...` à la main serait intercepté par notre propre arbre de commandes (qui n'a pas de sous-commande "valid") et rejeté avant même d'atteindre le serveur.
+**Important: these are NOT the same commands as `/cg valid ...` / `/chatgame valid ...`.** Those belong to the **server plugin** (see `commandTemplate` above); our mod sends them automatically in the background without going through the chat. The mod deliberately uses a different prefix (`/ar`) so it never collides with them — if our mod also registered `/cg` as a client command, typing `/cg valid ...` by hand would be caught by our own command tree (which has no "valid" sub-command) and rejected before ever reaching the server.
 
-| Commande | Effet |
+| Command | Effect |
 |---|---|
-| `/ar` | ouvre l'écran de config (voir plus bas) |
-| `/ar on` · `/ar off` | activer / désactiver sans ouvrir l'écran |
-| `/ar reload` | recharger la config |
-| `/ar add <trigger> \| <réponse> \| [mindelay] [maxdelay]` | ajouter/remplacer un trigger "Chat Games »" ; délais optionnels (défaut 1000/2000), séparés par `\|` ou juste un espace |
+| `/ar` | opens the config screen (see below) |
+| `/ar on` · `/ar off` | enable / disable without opening the screen |
+| `/ar reload` | reload the config |
+| `/ar add <trigger> \| <response> \| [mindelay] [maxdelay]` | add/replace a "Chat Games »" trigger; optional delays (default 1000/2000), separated by `\|` or just a space |
 
-`/autoresponder` fonctionne comme alias identique à `/ar`.
+`/autoresponder` works as an identical alias of `/ar`.
 
-## Écran de config
+## Config screen
 
-Écran maison (pas de dépendance externe), accessible via `/ar` ou via le menu ModMenu (Mods → AutoResponder → Config) si ModMenu est installé. Deux onglets :
+Custom screen (no external dependency), opened with `/ar` or from the ModMenu menu (Mods → AutoResponder → Config) if ModMenu is installed. Two tabs:
 
 **General**
-- **Actif** — bouton on/off.
-- **Cooldown de base (ms)** — délai additionnel appliqué à *toutes* les réponses programmées (flux "Chat Games »" et autres solveurs), en plus du `mindelay`/`maxdelay` propre à chaque entrée. Borné entre 2000 et 10000 ms — c'est souvent la plus grosse part du délai perçu (ex. solveur math 800-1400ms + cooldown de base ≈ 2800-3400ms).
-- **Style de notice** — comment afficher "réponse trouvée" / "aucune réponse connue" : `CHAT` (message dans le chat), `OVERLAY` (texte dessiné directement à l'écran, position réglable, disparaît après 3s), `TOAST` (popup coin haut-droit, style notification vanilla), `NONE` (rien).
-- **Position overlay** — où dessiner le texte quand le style est `OVERLAY` : coins/centre haut/bas. Sans effet pour les autres styles.
+- **Enabled** — on/off switch.
+- **Base cooldown (ms)** — extra delay applied to *all* scheduled answers ("Chat Games »" flow and other solvers), on top of each entry's own `mindelay`/`maxdelay`. Clamped between 2000 and 10000 ms — it is often the biggest part of the perceived delay (e.g. math solver 800-1400 ms + base cooldown ≈ 2800-3400 ms).
+- **Notice style** — how to show "answer found" / "no known answer": `Chat` (message in chat), `Overlay` (text drawn directly on screen, adjustable position, disappears after 3 s), `Toast` (top-right popup, vanilla notification style), `None` (nothing). The `‹ ›` arrows change the value: click on the left = previous, on the right = next.
+- **Overlay position** — where to draw the text when the style is `Overlay`: top/bottom corners/center. No effect for the other styles.
 
 **Chat Games »**
-- **Template de commande** — équivalent au `commandTemplate` du JSON (`{response}`/`{timer}`).
-- **Triggers » Chat Games** — zone de texte, une entrée par ligne au format `trigger|response|mindelay|maxdelay` (les deux derniers champs sont optionnels, défaut 1000/2000 si omis ou invalides).
+- **Command template** — equivalent to the JSON's `commandTemplate` (`{response}`/`{timer}`).
+- **Chat Games » triggers** — text area, one entry per line in the format `trigger|response|mindelay|maxdelay` (the last two fields are optional, default 1000/2000 if omitted or invalid).
 
-Le bouton **Sauvegarder** réécrit entièrement `autoresponder_questions.json` avec le contenu du menu — toute modification faite à la main dans le fichier pendant que l'écran est ouvert sera écrasée à la sauvegarde. **Annuler** ferme sans rien changer.
+The **Save** button fully rewrites `autoresponder_questions.json` with the menu's content — any hand edit made to the file while the screen is open will be overwritten on save. **Cancel** closes without changing anything.
 
-## Config
+## Config files
 
-Éditable dans `.minecraft/config/autoresponder/` :
+Editable in `.minecraft/config/autoresponder/`:
 
-- `autoresponder_questions.json` — triggers "Chat Games »" (trigger/response/mindelay/maxdelay + commandTemplate), alimenté par `/ar add` et par l'écran YACL
-- `words.txt` — dictionnaire unscramble (1 mot/ligne)
-- `questions.json` — questions → réponses (banque `Answer the following question:`)
-- `responders.json` — réponses fixes (fallback, hors flux "Chat Games »")
-- `learned.json.migrated` / `learned_questions.json.migrated` — anciens fichiers d'une version antérieure (avant stockage unifié), conservés tels quels, non relus
+- `autoresponder_questions.json` — "Chat Games »" triggers (trigger/response/mindelay/maxdelay + commandTemplate), fed by `/ar add` and by the config screen
+- `words.txt` — unscramble dictionary (1 word/line)
+- `questions.json` — questions → answers (`Answer the following question:` bank)
+- `responders.json` — fixed answers (fallback, outside the "Chat Games »" flow)
+- `learned.json.migrated` / `learned_questions.json.migrated` — old files from a previous version (before unified storage), kept as-is, not read
 
-## Compiler
+## Building
 
 ```
 gradlew.bat :26.3:build :26.2:build :26.1.2:build
 ```
-Un jar par version dans `versions/<mc>/build/libs/`. La version du mod se change dans
+One jar per version in `versions/<mc>/build/libs/`. The mod version is set in
 `stonecutter.properties.toml` (`mod.version`).
 
 ---
-⚠️ Automatiser les chat games peut enfreindre le règlement du serveur.
+⚠️ Automating chat games may break the server's rules.
