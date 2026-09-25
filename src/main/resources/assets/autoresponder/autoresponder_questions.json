@@ -5,211 +5,199 @@
             "trigger": "First one to say Rebirth",
             "response": "Rebirth",
             "mindelay": 1000,
-            "maxdelay": 2000,
-            "kind": "CHATGAMES"
+            "maxdelay": 2000
         },
         {
             "trigger": "First one to say Water",
             "response": "Water",
             "mindelay": 1000,
-            "maxdelay": 2000,
-            "kind": "CHATGAMES"
+            "maxdelay": 2000
         },
         {
             "trigger": "First one to say JuKrEpTzBn",
             "response": "JuKrEpTzBn",
             "mindelay": 2000,
-            "maxdelay": 5000,
-            "kind": "CHATGAMES"
+            "maxdelay": 5000
         },
         {
             "trigger": "First one to say ZaQoXpLkRt",
             "response": "ZaQoXpLkRt",
             "mindelay": 2000,
-            "maxdelay": 5000,
-            "kind": "CHATGAMES"
+            "maxdelay": 5000
         },
         {
             "trigger": "First one to say Aplosh",
             "response": "Aplosh",
             "mindelay": 1000,
-            "maxdelay": 2000,
-            "kind": "CHATGAMES"
+            "maxdelay": 2000
         },
         {
             "trigger": "First one to say Totem",
             "response": "Totem",
             "mindelay": 1000,
-            "maxdelay": 2000,
-            "kind": "CHATGAMES"
+            "maxdelay": 2000
         },
         {
             "trigger": "Unscramble lbSkcoky",
             "response": "Skyblock",
             "mindelay": 2000,
-            "maxdelay": 4000,
-            "kind": "CHATGAMES"
+            "maxdelay": 4000
         },
         {
             "trigger": "Unscramble epCerre",
             "response": "Creeper",
             "mindelay": 1000,
-            "maxdelay": 4000,
-            "kind": "CHATGAMES"
+            "maxdelay": 4000
         },
         {
             "trigger": "Unscramble rhWite",
             "response": "Wither",
             "mindelay": 1000,
-            "maxdelay": 4000,
-            "kind": "CHATGAMES"
+            "maxdelay": 4000
         },
         {
             "trigger": "Unscramble ieWtrh",
             "response": "Wither",
             "mindelay": 1000,
-            "maxdelay": 4000,
-            "kind": "CHATGAMES"
+            "maxdelay": 4000
         },
         {
             "trigger": "Unscramble todRnese",
             "response": "Redstone",
             "mindelay": 1000,
-            "maxdelay": 4000,
-            "kind": "CHATGAMES"
+            "maxdelay": 4000
         },
         {
             "trigger": "Unscramble aidnbOsi",
             "response": "Obsidian",
             "mindelay": 1000,
-            "maxdelay": 4000,
-            "kind": "CHATGAMES"
+            "maxdelay": 4000
         },
         {
             "trigger": "Unscramble hetiW",
             "response": "White",
             "mindelay": 1000,
-            "maxdelay": 4000,
-            "kind": "CHATGAMES"
+            "maxdelay": 4000
         },
         {
             "trigger": "Unscramble arnSwpe",
             "response": "Spawner",
             "mindelay": 2000,
-            "maxdelay": 5000,
-            "kind": "CHATGAMES"
+            "maxdelay": 5000
         },
         {
             "trigger": "Unscramble cklsBo",
             "response": "Blocks",
             "mindelay": 1000,
-            "maxdelay": 3000,
-            "kind": "CHATGAMES"
-        },
-        {
-            "trigger": "Answer the following question: What is the rarest ore in the Overworld?",
-            "response": "Emerald",
-            "mindelay": 1000,
-            "maxdelay": 4000,
-            "kind": "CHATGAMES"
+            "maxdelay": 3000
         },
         {
             "trigger": "Answer the following question: What is the name of the owner?",
             "response": "Meed",
             "mindelay": 1000,
-            "maxdelay": 2000,
-            "kind": "CHATGAMES"
+            "maxdelay": 2000
         },
         {
             "trigger": "What is 2 x 3?",
             "response": "6",
             "mindelay": 1000,
-            "maxdelay": 2000,
-            "kind": "CHATGAMES"
+            "maxdelay": 2000
         },
         {
             "trigger": "What is 12 + 2",
             "response": "14",
             "mindelay": 1000,
-            "maxdelay": 2000,
-            "kind": "CHATGAMES"
+            "maxdelay": 2000
         },
         {
             "trigger": "What is 1 x 15?",
             "response": "15",
             "mindelay": 1000,
-            "maxdelay": 2000,
-            "kind": "CHATGAMES"
+            "maxdelay": 2000
         },
         {
             "trigger": "What is 9 x 6?",
             "response": "54",
             "mindelay": 1000,
-            "maxdelay": 2000,
-            "kind": "CHATGAMES"
+            "maxdelay": 2000
         },
         {
             "trigger": "What material is needed to make a Nether Portal?",
             "response": "Obsidian",
             "mindelay": 2000,
-            "maxdelay": 4000,
-            "kind": "CHATGAMES"
+            "maxdelay": 4000
         },
         {
             "trigger": "What is the freezing point of water in Celsius?",
             "response": "0",
             "mindelay": 2000,
-            "maxdelay": 4000,
-            "kind": "CHATGAMES"
+            "maxdelay": 4000
         },
         {
             "trigger": "Unscramble wparneS",
             "response": "Spawner",
             "mindelay": 2000,
-            "maxdelay": 4000,
-            "kind": "CHATGAMES"
+            "maxdelay": 4000
         },
         {
             "trigger": "Answer the following question: What mob drops ender pearls?",
             "response": "Enderman",
             "mindelay": 2000,
-            "maxdelay": 3000,
-            "kind": "CHATGAMES"
+            "maxdelay": 3000
         },
         {
             "trigger": "Unscramble wparneS",
             "response": "Spawner",
             "mindelay": 2000,
-            "maxdelay": 4000,
-            "kind": "CHATGAMES"
+            "maxdelay": 4000
         },
         {
             "trigger": "Answer the following question: How many sides does a dice have?",
             "response": "6",
             "mindelay": 2000,
-            "maxdelay": 3000,
-            "kind": "CHATGAMES"
+            "maxdelay": 3000
         },
         {
             "trigger": "Answer the following question: How many legs does a spider have?",
             "response": "8",
             "mindelay": 2000,
-            "maxdelay": 4000,
-            "kind": "CHATGAMES"
+            "maxdelay": 4000
         },
         {
             "trigger": "Unscramble fnaritMce",
             "response": "Minecraft",
             "mindelay": 2000,
-            "maxdelay": 3000,
-            "kind": "CHATGAMES"
+            "maxdelay": 3000
         },
         {
             "trigger": "Unscramble sBockl",
             "response": "Blocks",
             "mindelay": 1000,
-            "maxdelay": 2000,
-            "kind": "CHATGAMES"
+            "maxdelay": 2000
+        },
+        {
+            "trigger": "Answer the following question: What is the rarest ore in the Overworld?",
+            "response": "Emerald",
+            "mindelay": 1000,
+            "maxdelay": 2000
+        },
+        {
+            "trigger": "Answer the following question: What is our premium currency called?",
+            "response": "Credits",
+            "mindelay": 1000,
+            "maxdelay": 3000
+        },
+        {
+            "trigger": "What is 19 - 2?",
+            "response": "17",
+            "mindelay": 500,
+            "maxdelay": 2000
+        },
+        {
+            "trigger": "First one to say Villager",
+            "response": "Villager",
+            "mindelay": 500,
+            "maxdelay": 2000
         }
     ]
 }

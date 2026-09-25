@@ -36,32 +36,27 @@ interface IChatHandler {
 }
 
 /**
- * Distingue, dans le fichier unique autoresponder_questions.json, quel handler/mecanisme de
- * matching une entree alimente : /ar addtrigger (substring sur "Chat Games » ..."),
- * /ar addquestion (banque "Answer the following question: ...") ou /ar add (unscramble,
- * matching par anagramme, pas par texte litteral).
- */
-enum class QuestionKind { CHATGAMES, QUESTION, UNSCRAMBLE }
-
-/**
- * Entree unique du fichier de config, alimentee par /ar add, /ar addquestion et /ar addtrigger
- * (kind distingue le mecanisme). Pour CHATGAMES, trigger est cherche en sous-chaine du message
- * (apres le prefixe "Chat Games »"). mindelay/maxdelay en ms.
+ * Entree du fichier de config du flux "Chat Games »" : trigger cherche en sous-chaine du
+ * message (apres le prefixe "Chat Games »"). mindelay/maxdelay en ms.
  */
 data class ValidationQuestion(
     val trigger: String,
     val response: String,
     val mindelay: Long = 1000,
-    val maxdelay: Long = 2000,
-    val kind: QuestionKind = QuestionKind.CHATGAMES
+    val maxdelay: Long = 2000
 )
 
 /**
- * Fichier de config complet : gabarit de commande (flux Chat Games uniquement) + liste unique
- * des entrees apprises par /ar add / addquestion / addtrigger. commandTemplate accepte les
- * placeholders {response} et {timer}.
+ * Fichier de config complet : gabarit de commande + liste des triggers appris via /ar add.
+ * commandTemplate accepte les placeholders {response} et {timer}.
  */
 data class ValidationConfigFile(
     val commandTemplate: String = "/cg valid {response} | {timer}",
     val questions: List<ValidationQuestion> = emptyList()
 )
+
+/** Style d'affichage des notices locales (trouve / pas trouve), configurable en jeu. */
+enum class NotificationStyle { CHAT, OVERLAY, TOAST, NONE }
+
+/** Emplacement a l'ecran du style OVERLAY (texte dessine directement dans le HUD). */
+enum class OverlayPosition { TOP_LEFT, TOP_CENTER, TOP_RIGHT, CENTER, BOTTOM_LEFT, BOTTOM_CENTER, BOTTOM_RIGHT }

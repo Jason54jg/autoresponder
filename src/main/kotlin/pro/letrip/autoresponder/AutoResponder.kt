@@ -11,23 +11,28 @@ import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents
+import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
 import net.minecraft.client.KeyMapping
 import net.minecraft.network.chat.Component
-import org.lwjgl.glfw.GLFW
+import org.slf4j.LoggerFactory
 
 object AutoResponder : ClientModInitializer {
+
+    private val logger = LoggerFactory.getLogger("AutoResponder")
 
     private lateinit var toggleKey: KeyMapping
 
     override fun onInitializeClient() {
         Config.load()
+        Notifications.registerHud()
 
         toggleKey = KeyMappingHelper.registerKeyMapping(
+            // Pas de GLFW.*/Type.KEYSYM : 26.3 est passe a SDL (KEYSYM -> KEYBOARD, LWJGL glfw retire).
+            // Ctor a 3 args (type clavier par defaut) + InputConstants.UNKNOWN valent sur 26.1 -> 26.3.
             KeyMapping(
                 "key.autoresponder.toggle",
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_UNKNOWN,
+                InputConstants.UNKNOWN.value,
                 KeyMapping.Category.MISC
             )
         )
@@ -55,8 +60,18 @@ object AutoResponder : ClientModInitializer {
         }
     }
 
-    /** Prefixe exact qui declenche le flux de validation "Chat Games". */
-    private const val CHAT_GAMES_PREFIX = "Chat Games »"
+    /**
+     * Prefixe qui declenche le flux de validation "Chat Games". Le separateur "»" apres
+     * "Chat Games" varie selon le serveur/resource pack (glyph Unicode custom, pas forcement
+     * U+00BB) : on ne matche que sur "Chat Games" pour eviter un decalage d'encodage silencieux.
+     */
+    private const val CHAT_GAMES_PREFIX = "Chat Games"
+
+    /**
+     * "X answered Y in Z.ZZZs!" : annonce de fin de round (quelqu'un a deja repondu), pas une
+     * question -> on l'ignore silencieusement, pas de notice "aucune reponse connue".
+     */
+    private val ROUND_RESULT_PATTERN = Regex("""\banswered\b.*\d+(?:\.\d+)?s!?\s*$""", RegexOption.IGNORE_CASE)
 
     // GAME et CHAT sont tous deux enregistres (certains serveurs routent les broadcasts sur l'un
     // ou l'autre selon le contexte) ; si le meme texte arrive deux fois quasi simultanement, on
@@ -68,7 +83,10 @@ object AutoResponder : ClientModInitializer {
     private fun onMessage(message: Component) {
         if (!Config.enabled) return
 
-        val text = message.string
+        // trim() : certains serveurs entourent le message de lignes vides/espaces de padding
+        // (ex. "\n\nChat Games » ..." avec des dizaines d'espaces avant), confirme par le log
+        // brut du client -> startsWith(prefixe) echouait silencieusement sans le trim.
+        val text = message.string.trim()
 
         val now = System.currentTimeMillis()
         if (text == lastMessageText && now - lastMessageAtMs < 200) return
@@ -78,15 +96,20 @@ object AutoResponder : ClientModInitializer {
         // Messages "Chat Games »" : geres exclusivement par le flux de validation
         // (notice ephemere + commande /cg valid ou /chatgame valid apres delai).
         // Pas de fallback vers les autres solveurs pour eviter une reponse publique instantanee.
-        if (text.startsWith(CHAT_GAMES_PREFIX)) {
-            val response = Config.validationHandler.handle(text)
-            if (response == null) {
-                // Aucun trigger connu : notice locale pour ne pas rater le round en silence.
-                Minecraft.getInstance().player?.sendSystemMessage(
-                    Component.literal("§7[AutoResponder] §caucune reponse connue pour ce Chat Games, reponds toi-meme !")
-                )
+        if (text.startsWith(CHAT_GAMES_PREFIX, ignoreCase = true)) {
+            if (ROUND_RESULT_PATTERN.containsMatchIn(text)) {
+                // "X answered Y in Z.ZZZs!" : annonce, pas une question a repondre.
                 return
             }
+            logger.info("[ChatGames] message recu: '{}' (enabled={}, entrees={})", text, Config.enabled, Config.validationConfig.questions.size)
+            val response = Config.validationHandler.handle(text)
+            if (response == null) {
+                logger.info("[ChatGames] aucun trigger ne matche ce message")
+                // Aucun trigger connu : notice locale pour ne pas rater le round en silence.
+                Notifications.show("autoresponder.msg.no_answer", isError = true)
+                return
+            }
+            logger.info("[ChatGames] match trouve, commande programmee: '{}'", response.message)
             MessageScheduler.submit(response)
             return
         }
@@ -100,82 +123,80 @@ object AutoResponder : ClientModInitializer {
 
     private fun toggle(client: Minecraft) {
         Config.setEnabled(!Config.enabled)
-        val state = if (Config.enabled) "§aON" else "§cOFF"
-        client.player?.sendSystemMessage(Component.literal("§7[AutoResponder] §fetat: $state"))
+        val state = Component.translatable(if (Config.enabled) "autoresponder.state.on" else "autoresponder.state.off")
+            .withStyle(if (Config.enabled) ChatFormatting.GREEN else ChatFormatting.RED)
+        client.player?.sendSystemMessage(prefixed(Component.translatable("autoresponder.msg.state", state)))
     }
 
     private fun buildCommand(name: String): LiteralArgumentBuilder<FabricClientCommandSource> =
         ClientCommands.literal(name)
-            .executes { flip(it.source); 1 }
-            .then(ClientCommands.literal("toggle").executes { flip(it.source); 1 })
+            // /ar seul ouvre directement l'ecran de config (le toggle actif/inactif y est deja,
+            // plus besoin d'un sous-comande "config" separee).
+            .executes { openConfigScreen(it.source); 1 }
             .then(ClientCommands.literal("on").executes { set(it.source, true); 1 })
             .then(ClientCommands.literal("off").executes { set(it.source, false); 1 })
             .then(ClientCommands.literal("reload").executes {
                 Config.load()
                 MessageScheduler.clear()
-                feedback(it.source, "§econfig rechargee")
+                feedback(it.source, "autoresponder.msg.reloaded", ChatFormatting.YELLOW)
                 1
             })
-            .then(ClientCommands.literal("config").executes {
-                try {
-                    // parent = null : evite de lire Minecraft.screen (nom/presence du champ a
-                    // varie entre versions 26.x et a deja cause un NoSuchFieldError au runtime).
-                    // YACL accepte un parent null (retour au jeu au lieu de l'ecran precedent).
-                    // setScreenAndShow (pas setScreen, renomme en 26.2) : voir Minecraft.class.
-                    Minecraft.getInstance().setScreenAndShow(AutoResponderConfigScreen.create(null))
-                } catch (e: Throwable) {
-                    feedback(it.source, "§cimpossible d'ouvrir l'ecran de config: ${e}")
-                    e.printStackTrace()
-                }
-                1
-            })
-            // Une seule commande "add", le kind choisit le mecanisme de detection (meme fichier
-            // autoresponder_questions.json pour les trois, distingues par le champ kind).
+            // Une seule commande "add", sans variable de type : ajoute toujours un trigger
+            // "Chat Games »" (substring apres le prefixe).
             .then(ClientCommands.literal("add")
-                .then(ClientCommands.literal("unscramble")
-                    .then(ClientCommands.argument("text", StringArgumentType.greedyString())
-                        .executes { ctx -> addEntry(ctx, QuestionKind.UNSCRAMBLE, 800, 1400) }))
-                .then(ClientCommands.literal("question")
-                    .then(ClientCommands.argument("text", StringArgumentType.greedyString())
-                        .executes { ctx -> addEntry(ctx, QuestionKind.QUESTION, 800, 1400) }))
-                .then(ClientCommands.literal("chatgames")
-                    .then(ClientCommands.argument("text", StringArgumentType.greedyString())
-                        .executes { ctx -> addEntry(ctx, QuestionKind.CHATGAMES, 1000, 2000) })))
+                .then(ClientCommands.argument("text", StringArgumentType.greedyString())
+                    .executes { ctx -> addEntry(ctx, 1000, 2000) }))
+
+    private fun openConfigScreen(source: FabricClientCommandSource) {
+        // execute { } : reporte l'ouverture au tick suivant. Appeler setScreenAndShow
+        // directement ici perd la course contre la fermeture du ChatScreen (Minecraft ferme le
+        // chat juste apres l'execution de la commande, sur le meme tick, ce qui ecrasait notre
+        // ecran juste pose). Confirme par le fait que /ar config echouait alors que le meme
+        // ecran ouvert depuis ModMenu (pas de chat en cours) marchait.
+        Minecraft.getInstance().execute {
+            try {
+                // parent = null : evite de lire Minecraft.screen (a deja cause un NoSuchFieldError
+                // au runtime entre versions). setScreenAndShow (pas setScreen, renomme en 26.2).
+                Minecraft.getInstance().setScreenAndShow(CustomConfigScreen(null))
+            } catch (e: Throwable) {
+                feedback(source, "autoresponder.msg.open_failed", ChatFormatting.RED, e.toString())
+                e.printStackTrace()
+            }
+        }
+    }
 
     /**
-     * Logique partagee des 3 sous-commandes de /ar add. Parse "trigger | reponse | [mindelay] [maxdelay]"
-     * (delais optionnels, "|" ou espace, defauts par kind) et persiste dans autoresponder_questions.json.
+     * Parse "trigger | reponse | [mindelay] [maxdelay]" (delais optionnels, "|" ou espace,
+     * defautMin/defautMax si absents) et persiste dans autoresponder_questions.json.
      */
-    private fun addEntry(
-        ctx: CommandContext<FabricClientCommandSource>,
-        kind: QuestionKind,
-        defaultMin: Long,
-        defaultMax: Long
-    ): Int {
+    private fun addEntry(ctx: CommandContext<FabricClientCommandSource>, defaultMin: Long, defaultMax: Long): Int {
         val parts = StringArgumentType.getString(ctx, "text").split("|")
         val trigger = parts.getOrNull(0)?.trim().orEmpty()
         val response = parts.getOrNull(1)?.trim().orEmpty()
         if (trigger.isEmpty() || response.isEmpty()) {
-            feedback(ctx.source, "§cformat: /ar add <unscramble|question|chatgames> <trigger> | <reponse> | [mindelay] [maxdelay]")
+            feedback(ctx.source, "autoresponder.msg.add_format", ChatFormatting.RED)
             return 1
         }
         val remainder = parts.drop(2).joinToString(" ")
         val numbers = Regex("""\d+""").findAll(remainder).map { it.value.toLong() }.toList()
         val mindelay = numbers.getOrNull(0) ?: defaultMin
         val maxdelay = numbers.getOrNull(1) ?: defaultMax
-        Config.addEntry(trigger, response, mindelay, maxdelay, kind)
-        feedback(ctx.source, "§aappris (${kind.name.lowercase()}): §f$trigger §7-> §f$response §7($mindelay-$maxdelay ms)")
+        Config.addEntry(trigger, response, mindelay, maxdelay)
+        feedback(ctx.source, "autoresponder.msg.learned", ChatFormatting.GREEN, trigger, response, mindelay, maxdelay)
         return 1
     }
 
-    private fun flip(source: FabricClientCommandSource) = set(source, !Config.enabled)
-
     private fun set(source: FabricClientCommandSource, value: Boolean) {
         Config.setEnabled(value)
-        feedback(source, if (value) "§aactive" else "§cdesactive")
+        if (value) feedback(source, "autoresponder.msg.enabled", ChatFormatting.GREEN)
+        else feedback(source, "autoresponder.msg.disabled", ChatFormatting.RED)
     }
 
-    private fun feedback(source: FabricClientCommandSource, msg: String) {
-        source.sendFeedback(Component.literal("§7[AutoResponder] §f$msg"))
+    private fun prefixed(message: Component): Component =
+        Component.literal("[AutoResponder] ").withStyle(ChatFormatting.GRAY).append(message)
+
+    /** [key] = cle de traduction : le retour suit la langue choisie dans Minecraft. */
+    private fun feedback(source: FabricClientCommandSource, key: String, color: ChatFormatting = ChatFormatting.WHITE, vararg args: Any) {
+        source.sendFeedback(prefixed(Component.translatable(key, *args).withStyle(color)))
     }
 }

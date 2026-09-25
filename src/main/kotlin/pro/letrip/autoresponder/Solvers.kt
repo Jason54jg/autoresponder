@@ -1,8 +1,5 @@
 package pro.letrip.autoresponder
 
-import net.minecraft.client.Minecraft
-import net.minecraft.network.chat.Component
-
 /** Cle normalisee d'une question (minuscule, sans ponctuation, espaces compresses). */
 fun normalizeQuestion(question: String): String =
     question.lowercase().replace(Regex("""[^a-z0-9 ]"""), "").trim().replace(Regex("""\s+"""), " ")
@@ -25,24 +22,23 @@ class FirstToSayHandler : IChatHandler {
 }
 
 /**
- * "Unscramble abc" -> mot du dictionnaire dont les lettres triees correspondent.
- * Delai par entree (mindelay/maxdelay), 800/1400ms par defaut pour le dictionnaire de base.
+ * "Unscramble abc" -> mot du dictionnaire dont les lettres triees correspondent. Delai fixe
+ * 800/1400ms.
  */
-class UnscrambleHandler(words: List<String>, learned: List<ValidationQuestion>) : IChatHandler {
+class UnscrambleHandler(words: List<String>) : IChatHandler {
 
     private val regex = Regex("""unscramble[:\s]+([A-Za-z]+)""", RegexOption.IGNORE_CASE)
-    private val byLetters: Map<String, ValidationQuestion> = buildMap {
+    private val byLetters: Map<String, String> = buildMap {
         for (word in words) {
             val key = sortedLetters(word)
-            if (key.isNotEmpty()) putIfAbsent(key, ValidationQuestion(word, word, 800, 1400, QuestionKind.UNSCRAMBLE))
+            if (key.isNotEmpty()) putIfAbsent(key, word)
         }
-        for (entry in learned) put(sortedLetters(entry.trigger), entry) // apprises priment sur le dico
     }
 
     override fun handle(text: String): Response? {
         val scrambled = regex.find(text)?.groupValues?.get(1) ?: return null
-        val entry = byLetters[sortedLetters(scrambled)] ?: return null
-        return Response(entry.response, entry.mindelay, entry.maxdelay)
+        val answer = byLetters[sortedLetters(scrambled)] ?: return null
+        return Response(answer, 800, 1400)
     }
 }
 
@@ -122,7 +118,7 @@ class ChatGamesValidationHandler(
         // Resolu ici (cooldown de base inclus) pour que {timer} corresponde exactement au delai reel.
         val delay = MessageScheduler.resolveDelay(entry.mindelay, entry.maxdelay)
 
-        notifyLocally()
+        Notifications.show("autoresponder.msg.answer_found")
 
         val command = commandTemplate
             .replace("{response}", entry.response)
@@ -130,16 +126,5 @@ class ChatGamesValidationHandler(
             .removePrefix("/")
 
         return Response(command, delay, delay, isCommand = true, delayResolved = true)
-    }
-
-    /**
-     * Message ephemere dans le chat, cote client uniquement (jamais envoye au serveur).
-     * sendSystemMessage plutot que l'actionbar : un serveur de chat games spamme deja
-     * l'actionbar (timers, XP...), qui ecraserait notre notice avant qu'elle soit lue.
-     */
-    private fun notifyLocally() {
-        Minecraft.getInstance().player?.sendSystemMessage(
-            Component.literal("§7[AutoResponder] §fReponse trouvee ! Envoi automatique programme.")
-        )
     }
 }

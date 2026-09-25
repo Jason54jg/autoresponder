@@ -1,63 +1,70 @@
 plugins {
-    id("net.fabricmc.fabric-loom") version "1.17-SNAPSHOT"
+    // Applique automatiquement la bonne variante de Fabric Loom selon la version MC du noeud actif.
+    id("dev.kikugie.loom-back-compat")
     kotlin("jvm") version "2.4.0"
 }
 
-version = property("mod_version") as String
-group = property("maven_group") as String
+// group vient de stonecutter (mod.group), NE PAS le fixer ici.
+version = "${property("mod.version")}+${sc.current.version}"
+base.archivesName.set(property("mod.id") as String)
 
-base {
-    archivesName.set(property("archives_base_name") as String)
+val requiredJava: JavaVersion = when {
+    sc.current.parsed >= "26.1" -> JavaVersion.VERSION_25
+    sc.current.parsed >= "1.20.5" -> JavaVersion.VERSION_21
+    else -> JavaVersion.VERSION_17
 }
 
 repositories {
-    maven("https://maven.fabricmc.net/") { name = "Fabric" }
-    maven("https://maven.isxander.dev/releases") { name = "isxander" }
     maven("https://maven.terraformersmc.com/releases/") { name = "TerraformersMC" }
 }
 
 dependencies {
-    // 26.x est dés-obfusque : aucune ligne `mappings`, le jar est deja en noms Mojang.
-    minecraft("com.mojang:minecraft:${property("minecraft_version")}")
-    implementation("net.fabricmc:fabric-loader:${property("loader_version")}")
+    minecraft("com.mojang:minecraft:${sc.current.version}")
+    // Mappings Mojang officielles (deja deobfusque pour 26.x, sinon applique le mapping obfuscation->named).
+    loomx.applyMojangMappings()
 
-    implementation("net.fabricmc.fabric-api:fabric-api:${property("fabric_version")}")
-    implementation("net.fabricmc:fabric-language-kotlin:${property("fabric_kotlin_version")}")
+    // modXxx fonctionne meme sur 26.1+ : loom-back-compat convertit vers l'equivalent moderne.
+    modImplementation("net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
+    modImplementation("net.fabricmc.fabric-api:fabric-api:${property("deps.fabric_api")}")
+    modImplementation("net.fabricmc:fabric-language-kotlin:${property("deps.fabric_kotlin")}")
 
-    // Menu de config : requis (l'ecran /cg config et le menu ModMenu en dependent directement).
-    // Ce setup Loom saute le remapping (26.x deja en noms Mojang) donc pas de configurations
-    // "mod*" (elles servent a marquer ce qui doit etre remappe) : implementation classique,
-    // comme fabric-api/fabric-language-kotlin ci-dessus.
-    implementation("dev.isxander:yet-another-config-lib:${property("yacl_version")}")
-
-    // ModMenu : optionnel, compileOnly seulement -> pas requis au runtime pour les joueurs qui
-    // n'ont pas ModMenu (l'entrypoint "modmenu" du fabric.mod.json n'est alors jamais lu).
-    compileOnly("com.terraformersmc:modmenu:${property("modmenu_version")}")
+    // ModMenu : optionnel, compileOnly seulement -> pas requis au runtime pour qui ne l'a pas.
+    modCompileOnly("com.terraformersmc:modmenu:${property("deps.modmenu")}")
 }
 
-tasks.processResources {
-    inputs.property("version", project.version)
-    filesMatching("fabric.mod.json") {
-        expand("version" to project.version)
+loom {
+    runConfigs.all {
+        runDirectory = rootProject.file("run") // Un seul dossier run/ partage entre versions.
     }
-}
-
-tasks.withType<JavaCompile>().configureEach {
-    options.release.set(25)
-}
-
-kotlin {
-    jvmToolchain(25)
 }
 
 java {
     withSourcesJar()
-    sourceCompatibility = JavaVersion.VERSION_25
-    targetCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = requiredJava
+    sourceCompatibility = requiredJava
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(requiredJava.majorVersion)
+    }
 }
 
-tasks.jar {
-    from("LICENSE") {
-        rename { "${it}_${base.archivesName.get()}" }
+kotlin {
+    jvmToolchain(requiredJava.majorVersion.toInt())
+}
+
+tasks.processResources {
+    val modVersion = project.version.toString()
+    inputs.property("version", modVersion)
+    filesMatching("fabric.mod.json") {
+        expand("version" to modVersion)
     }
+}
+
+tasks.register<Copy>("buildAndCollect") {
+    group = "build"
+    description = "Compile le jar de cette version et le copie dans build/libs/<version mod>/"
+
+    inputs.property("version", project.property("mod.version"))
+    // loomx.mod(Sources)Jar renvoie la tache jar de la variante loom appliquee pour ce noeud.
+    from(loomx.modJar.flatMap { it.archiveFile }, loomx.modSourcesJar.flatMap { it.archiveFile })
+    into(rootProject.layout.buildDirectory.dir("libs/${property("mod.version")}"))
 }

@@ -9,5 +9,5 @@ import com.terraformersmc.modmenu.api.ModMenuApi
  */
 class ModMenuIntegration : ModMenuApi {
     override fun getModConfigScreenFactory(): ConfigScreenFactory<*> =
-        ConfigScreenFactory { parent -> AutoResponderConfigScreen.create(parent) }
+        ConfigScreenFactory { parent -> CustomConfigScreen(parent) }
 }
