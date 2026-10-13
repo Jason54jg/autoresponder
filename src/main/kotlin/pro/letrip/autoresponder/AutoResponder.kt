@@ -11,6 +11,7 @@ import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
 import net.minecraft.client.KeyMapping
@@ -49,12 +50,16 @@ object AutoResponder : ClientModInitializer {
             MessageScheduler.tick(client)
         }
 
+        // Reponses programmees puis changement de serveur/deconnexion : la file est videe pour
+        // ne jamais envoyer une reponse prevue pour l'ancien serveur sur le nouveau.
+        ClientPlayConnectionEvents.DISCONNECT.register { _, _ -> MessageScheduler.clear() }
+
         ClientCommandRegistrationCallback.EVENT.register { dispatcher, _ ->
-            // "ar"/"autoresponder", pas "cg"/"chatgame" : ces deux-la sont les commandes du
-            // PLUGIN SERVEUR (voir commandTemplate, ex. "/cg valid ..."). Si notre mod les
-            // enregistrait aussi cote client, taper "/cg valid ..." serait intercepte par notre
-            // propre arbre de commandes (aucun sous-commande "valid" chez nous) et rejete avant
-            // meme d'atteindre le serveur.
+            // "ar"/"autoresponder" : les commandes CLIENTES du mod. Note : le plugin SERVEUR
+            // utilise lui aussi /ar (voir commandTemplate, ex. "/ar add ..."). Taper sa commande
+            // de validation a la main reste intercepte par notre propre arbre (aucune sous-commande
+            // correspondante chez nous) et rejete avant d'atteindre le serveur. L'envoi automatique,
+            // lui, part en direct via sendCommand sans passer par le chat, donc sans collision.
             dispatcher.register(buildCommand("autoresponder"))
             dispatcher.register(buildCommand("ar"))
         }
@@ -75,7 +80,7 @@ object AutoResponder : ClientModInitializer {
 
     // GAME et CHAT sont tous deux enregistres (certains serveurs routent les broadcasts sur l'un
     // ou l'autre selon le contexte) ; si le meme texte arrive deux fois quasi simultanement, on
-    // ignore le doublon pour ne pas soumettre 2x la commande /cg valid (qui a des effets de bord
+    // ignore le doublon pour ne pas soumettre 2x la commande de validation (qui a des effets de bord
     // cote serveur, ex. teams de scoreboard, et peut le desynchroniser -> crash client).
     private var lastMessageText: String? = null
     private var lastMessageAtMs: Long = 0
@@ -94,7 +99,7 @@ object AutoResponder : ClientModInitializer {
         lastMessageAtMs = now
 
         // Messages "Chat Games »" : geres exclusivement par le flux de validation
-        // (notice ephemere + commande /cg valid ou /chatgame valid apres delai).
+        // (notice ephemere + commande de validation serveur apres delai).
         // Pas de fallback vers les autres solveurs pour eviter une reponse publique instantanee.
         if (text.startsWith(CHAT_GAMES_PREFIX, ignoreCase = true)) {
             if (ROUND_RESULT_PATTERN.containsMatchIn(text)) {

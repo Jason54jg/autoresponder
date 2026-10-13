@@ -9,14 +9,16 @@ fun sortedLetters(word: String): String =
     word.lowercase().toCharArray().sorted().joinToString("")
 
 /**
- * "First one to say X" / "first one to type X" -> renvoie X tel quel.
+ * "First one to say X" / "first one to type X" -> renvoie X tel quel (peut contenir
+ * plusieurs mots, ex. "Golden Apple"). La ponctuation finale (!/.) est retiree.
  */
 class FirstToSayHandler : IChatHandler {
 
-    private val regex = Regex("""first (?:one|player) to (?:say|type)[:\s]+(\S+)""", RegexOption.IGNORE_CASE)
+    private val regex = Regex("""first (?:one|player) to (?:say|type)[:\s]+(.+?)\s*$""", RegexOption.IGNORE_CASE)
 
     override fun handle(text: String): Response? {
-        val token = regex.find(text)?.groupValues?.get(1) ?: return null
+        val token = regex.find(text)?.groupValues?.get(1)?.trim()?.trimEnd('.', '!', '?')?.trim().orEmpty()
+        if (token.isEmpty()) return null
         return Response(token, 800, 1400)
     }
 }
@@ -91,12 +93,15 @@ class StaticResponderHandler(private val responders: List<Responder>) : IChatHan
         return Response(match.message, match.minDelayInMilliseconds, match.maxDelayInMilliseconds)
     }
 
-    private fun matches(responder: Responder, text: String): Boolean =
-        if (responder.regex) {
+    private fun matches(responder: Responder, text: String): Boolean {
+        // Pattern vide = entree incomplète : ne doit jamais matcher (sinon contains("") est toujours vrai).
+        if (responder.pattern.isEmpty()) return false
+        return if (responder.regex) {
             Regex(responder.pattern).containsMatchIn(text)
         } else {
-            text.contains(responder.pattern, ignoreCase = false)
+            text.contains(responder.pattern, ignoreCase = true)
         }
+    }
 }
 
 /**
@@ -104,7 +109,7 @@ class StaticResponderHandler(private val responders: List<Responder>) : IChatHan
  * 1. Ne traite que les messages deja filtres sur le prefixe "Chat Games »" (fait par l'appelant).
  * 2. Cherche une entree dont le trigger est contenu dans le message.
  * 3. Notifie le joueur en local (actionbar, jamais envoye au serveur -> ephemere).
- * 4. Renvoie une Response "commande" a delai fixe qui embarque {response}/{timer} deja resolus,
+ * 4. Renvoie une Response "commande" a delai fixe qui embarque les placeholders deja resolus,
  *    pour que le timer affiche dans la commande corresponde exactement au delai reellement attendu.
  */
 class ChatGamesValidationHandler(
@@ -120,9 +125,16 @@ class ChatGamesValidationHandler(
 
         Notifications.show("autoresponder.msg.answer_found")
 
+        // Tous les placeholders du gabarit sont substitues : {question} = trigger matche,
+        // {response} = reponse, {timer} = delai reel, {min}/{max} = bornes de l'entree,
+        // {min | max} = les deux bornes (remplace avant {min}/{max} par principe).
         val command = commandTemplate
             .replace("{response}", entry.response)
+            .replace("{question}", entry.trigger)
             .replace("{timer}", delay.toString())
+            .replace("{min | max}", "${entry.mindelay} ${entry.maxdelay}")
+            .replace("{min}", entry.mindelay.toString())
+            .replace("{max}", entry.maxdelay.toString())
             .removePrefix("/")
 
         return Response(command, delay, delay, isCommand = true, delayResolved = true)

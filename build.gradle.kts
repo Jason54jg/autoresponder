@@ -53,9 +53,16 @@ kotlin {
 
 tasks.processResources {
     val modVersion = project.version.toString()
+    // project. explicite : dans un bloc de config de tache, property() seul se resoudrait
+    // contre la tache. Variable locale (pas un val top-level) pour rester compatible
+    // avec le configuration cache.
+    val mcCompat = project.property("mod.mc_compat") as String
     inputs.property("version", modVersion)
+    // Le loader refuse proprement le jar sur une mauvaise version au lieu de crasher
+    // plus tard sur une methode manquante.
+    inputs.property("minecraft", mcCompat)
     filesMatching("fabric.mod.json") {
-        expand("version" to modVersion)
+        expand("version" to modVersion, "minecraft" to mcCompat)
     }
 }
 

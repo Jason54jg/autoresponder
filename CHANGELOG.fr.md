@@ -5,6 +5,37 @@
 Une entrée par demande : la version du mod augmente à chaque demande (1.1.1, 1.1.2, 1.1.3, ...).
 La version est définie à un seul endroit : `mod.version` dans `stonecutter.properties.toml`.
 
+## 1.1.5
+
+### Correctifs
+- **`commandTemplate` par défaut aligné sur la commande du serveur** : le serveur n'utilise plus
+  `/cg valid ...` mais une commande `/ar add ...`, le défaut est donc
+  `"/ar add {question} | {response} | {min | max}"` (valeur d'origine restaurée). Le handler substitue
+  désormais tous les placeholders : `{question}` (trigger matché), `{response}`, `{timer}` (délai réel,
+  cooldown inclus), `{min}` / `{max}` (bornes de l'entrée) et `{min | max}` (les deux bornes) — rien
+  n'est jamais envoyé tel quel. Note : le serveur partageant notre préfixe `/ar`, ne tape jamais la
+  commande de validation à la main (notre arbre client l'intercepterait) ; l'envoi automatique contourne
+  le chat et n'est pas affecté. Si votre fichier de config a déjà été créé avec le modèle `/cg valid ...`
+  de la 1.1.5, mettez à jour sa ligne `commandTemplate` (ou supprimez le fichier pour le régénérer —
+  vos triggers seront perdus).
+- **Défaut du cooldown de base** : un `settings.json` frais démarrait à 500 ms alors que la plage
+  documentée et imposée est 2000–10000 ms. Le défaut est maintenant 2000, et `load()` ramène toute valeur
+  hors borne (anciens fichiers à 500, éditions manuelles) dans la plage.
+- **Dépendance `minecraft` par version** : `fabric.mod.json` déclarait `"minecraft": "*"`, donc un jar 26.3
+  se chargeait silencieusement sur 26.1 puis crashait sur une méthode manquante. Il utilise maintenant le
+  `mod.mc_compat` de la version (`~26.1` / `~26.2` / `~26.3`), le loader rejette proprement les jars incompatibles.
+- **File vidée à la déconnexion** : les réponses programmées ne fuient plus vers le serveur suivant après
+  un changement de serveur / une déconnexion.
+- **Réponses `First one to say` multi-mots** : le handler ne capturait que le premier mot
+  (`"Golden Apple"` → `"Golden"`). Il capture maintenant toute la cible (ponctuation finale retirée).
+- **Responders statiques insensibles à la casse** comme tous les autres handlers, et les entrées avec un
+  `pattern` vide ne matchent jamais (avant, `contains("")` matchait tout).
+- **Fichiers de config corrompus** : ne crashent plus l'init ni `/ar reload` / `/ar add` (repli sur le défaut
+  fichier par fichier), et les entrées `Responder` ont le même deserializer défensif que `ValidationQuestion`
+  (`null` explicites gérés aussi).
+- Entrée `Unscramble wparneS` en double supprimée ; commentaire de `words.txt` pointant vers l'ancienne
+  commande `/chatgames reload` corrigé.
+
 ## 1.1.4
 
 ### Documentation

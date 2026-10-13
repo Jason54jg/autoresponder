@@ -146,12 +146,6 @@
             "maxdelay": 3000
         },
         {
-            "trigger": "Unscramble wparneS",
-            "response": "Spawner",
-            "mindelay": 2000,
-            "maxdelay": 4000
-        },
-        {
             "trigger": "Answer the following question: How many sides does a dice have?",
             "response": "6",
             "mindelay": 2000,

@@ -1,7 +1,7 @@
 # Dictionnaire unscramble. 1 mot par ligne. Lignes vides et # ignorees.
 # Priorite = ordre du fichier (si 2 mots sont anagrammes, le premier gagne).
 # Les mots Minecraft sont en haut (prioritaires), mots anglais courants en bas.
-# Ajoute ici tout mot vu sur ton serveur puis /chatgames reload.
+# Ajoute ici tout mot vu sur ton serveur puis /ar reload.
 
 # --- Minecraft: minerais / materiaux / blocs ---
 Stone

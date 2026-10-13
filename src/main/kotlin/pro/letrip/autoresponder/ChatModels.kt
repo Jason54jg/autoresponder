@@ -48,10 +48,12 @@ data class ValidationQuestion(
 
 /**
  * Fichier de config complet : gabarit de commande + liste des triggers appris via /ar add.
- * commandTemplate accepte les placeholders {response} et {timer}.
+ * commandTemplate accepte les placeholders {question} (trigger matche), {response},
+ * {timer} (delai reel, cooldown de base inclus), {min}/{max} (bornes de l'entree) et
+ * {min | max} (les deux bornes).
  */
 data class ValidationConfigFile(
-    val commandTemplate: String = "/cg valid {response} | {timer}",
+    val commandTemplate: String = "/ar add {question} | {response} | {min | max}",
     val questions: List<ValidationQuestion> = emptyList()
 )
 

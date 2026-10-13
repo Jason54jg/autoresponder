@@ -5,6 +5,37 @@
 One entry per request: the mod version goes up with every request (1.1.1, 1.1.2, 1.1.3, ...).
 The version is defined in a single place: `mod.version` in `stonecutter.properties.toml`.
 
+## 1.1.5
+
+### Fixes
+- **Default `commandTemplate` follows the server command**: the server no longer uses `/cg valid ...`
+  but an `/ar add ...` command, so the default is `"/ar add {question} | {response} | {min | max}"`
+  (restored to the originally provided value). The handler now substitutes every placeholder:
+  `{question}` (matched trigger), `{response}`, `{timer}` (actual drawn delay, base cooldown included),
+  `{min}` / `{max}` (entry bounds) and `{min | max}` (both bounds) — nothing is ever sent literally.
+  Note: since the server shares our `/ar` prefix, never type the validation command by hand (our client
+  tree would intercept it); the automatic send bypasses the chat and is unaffected. If your config file
+  was already created with the `/cg valid ...` template from 1.1.5, update its `commandTemplate` line
+  (or delete the file to regenerate it — your triggers will be lost).
+- **Base cooldown default**: fresh `settings.json` started at 500 ms although the documented and
+  enforced range is 2000–10000 ms. Default is now 2000, and `load()` coerces any out-of-range value
+  (old 500 files, hand edits) back into range.
+- **Per-version `minecraft` dependency**: `fabric.mod.json` declared `"minecraft": "*"`, so a 26.3 jar
+  loaded silently on 26.1 and crashed later on a missing method. It now expands to the version's
+  `mod.mc_compat` (`~26.1` / `~26.2` / `~26.3`), so the loader rejects mismatched jars cleanly.
+- **Scheduler cleared on disconnect**: scheduled answers no longer leak to the next server after a
+  server switch / disconnect.
+- **`First one to say` multi-word answers**: the handler only captured the first token
+  (`"Golden Apple"` → `"Golden"`). It now captures the whole target
+  (trailing `!`/`.` stripped).
+- **Static responders are now case-insensitive** like every other handler, and entries with an empty
+  `pattern` never match (before, `contains("")` matched everything).
+- **Corrupt config files no longer crash** the init or `/ar reload` / `/ar add`: each JSON file falls
+  back to its default, and `Responder` entries get the same defensive deserializer as
+  `ValidationQuestion` (explicit `null`s handled too).
+- Removed a duplicated `Unscramble wparneS` default entry; fixed the `words.txt` comment pointing to
+  the old `/chatgames reload` command.
+
 ## 1.1.4
 
 ### Documentation

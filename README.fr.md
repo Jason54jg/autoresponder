@@ -8,7 +8,7 @@ Mod Fabric (client) qui répond **automatiquement** aux chat games du serveur (a
 
 Dans `.minecraft/mods/`, mets 3 jars :
 
-1. Le mod : `autoresponder-<version>+<mc>.jar` (ex. `autoresponder-1.1.4+26.3.jar`)
+1. Le mod : `autoresponder-<version>+<mc>.jar` (ex. `autoresponder-1.1.5+26.3.jar`)
 2. **Fabric API**
 3. **Fabric Language Kotlin**
 
@@ -25,18 +25,18 @@ Quand un message reçu commence **exactement** par `Chat Games »` (espaces/reto
 1. Le mod analyse le reste du message et cherche une entrée correspondante dans `autoresponder_questions.json`.
 2. Si trouvée : affiche une notice **locale côté client** (jamais envoyée au serveur, style configurable — voir plus bas) :
    `[AutoResponder] Réponse trouvée ! Envoi automatique programmé.`
-   Puis, après un délai aléatoire tiré entre `mindelay` et `maxdelay` (ms), envoie la commande de validation configurée au serveur, par ex. `/cg valid Rebirth | 1532`.
+   Puis, après un délai aléatoire tiré entre `mindelay` et `maxdelay` (ms), envoie la commande de validation configurée au serveur, par ex. `ar add First one to say Rebirth | Rebirth | 1000 2000`.
 3. Si **aucune** entrée ne correspond : notice locale `[AutoResponder] Aucune réponse connue pour ce Chat Games, réponds toi-même !` — rien n'est envoyé au serveur, à toi de répondre à la main.
 
 Le texte des notices suit la langue de Minecraft. Aucune réponse publique instantanée n'est jamais envoyée pour ces messages, dans un cas comme dans l'autre.
 
-`/cg valid ...` (ou `/chatgame valid ...`) est la commande du **plugin du serveur**, envoyée automatiquement en arrière-plan (`connection.sendCommand`, ne passe pas par le chat local). Elle n'apparaît pas dans le tab-complete de nos commandes `/ar` — normal, ce n'est pas une commande à nous, et si le serveur ne l'a pas déclarée dans son propre arbre Brigadier, elle n'apparaîtra pas non plus au tab-complete général du jeu. Rien à faire côté mod.
+`ar add ...` est la commande de validation du **plugin du serveur**, envoyée automatiquement en arrière-plan (`connection.sendCommand`, ne passe pas par le chat local). Ne la tape jamais à la main : notre mod possède l'arbre client `/ar`, donc une commande de validation tapée à la main serait interceptée par notre propre arbre (aucune sous-commande correspondante) et rejetée avant d'atteindre le serveur. L'envoi automatique contourne le chat et n'est pas affecté. Elle n'apparaît pas au tab-complete — normal ; rien à faire côté mod.
 
 ### Config `autoresponder_questions.json`
 
 ```json
 {
-  "commandTemplate": "/cg valid {response} | {timer}",
+  "commandTemplate": "/ar add {question} | {response} | {min | max}",
   "questions": [
     {
       "trigger": "First one to say Rebirth",
@@ -51,7 +51,7 @@ Le texte des notices suit la langue de Minecraft. Aucune réponse publique insta
 - `trigger` : sous-chaîne cherchée dans le message (après le préfixe `Chat Games »`).
 - `response` : valeur injectée dans `{response}`.
 - `mindelay` / `maxdelay` : bornes en millisecondes du délai aléatoire avant envoi (s'ajoute au **cooldown de base**, voir écran de config).
-- `commandTemplate` : gabarit de la commande finale. Placeholders `{response}` et `{timer}` (délai réellement tiré, en ms — cooldown de base inclus). Change-le en `/chatgame valid {response} | {timer}` si besoin.
+- `commandTemplate` : gabarit de la commande finale. Placeholders : `{question}` (trigger matché), `{response}`, `{timer}` (délai réellement tiré, en ms — cooldown de base inclus), `{min}` / `{max}` (bornes de l'entrée), `{min | max}` (les deux bornes).
 
 ## Autres solveurs (messages sans préfixe "Chat Games »")
 
@@ -67,7 +67,7 @@ Réponse envoyée dans le **chat public**, délai fixe 800-1400ms + cooldown de 
 
 ## Commandes (`/ar` ou `/autoresponder`)
 
-**Important : ce ne sont PAS les mêmes commandes que `/cg valid ...` / `/chatgame valid ...`.** Celles-ci sont celles du **plugin du serveur** (voir `commandTemplate` plus haut), notre mod les envoie automatiquement en arrière-plan sans passer par le chat. Le mod utilise volontairement un préfixe différent (`/ar`) pour ne jamais entrer en collision avec elles — si notre mod enregistrait aussi `/cg` comme commande client, taper `/cg valid ...` à la main serait intercepté par notre propre arbre de commandes (qui n'a pas de sous-commande "valid") et rejeté avant même d'atteindre le serveur.
+**Important : nos commandes `/ar` NE SONT PAS la commande de validation `ar add ...` du serveur.** Les nôtres (`/ar`, `/ar on|off|reload|add`) configurent le mod en local ; celle du serveur valide les réponses (voir `commandTemplate` plus haut) et est envoyée automatiquement en arrière-plan sans passer par le chat. Comme les deux partagent le préfixe `/ar`, ne tape jamais la commande de validation à la main — elle serait interceptée par notre propre arbre de commandes client (aucune sous-commande correspondante) et rejetée avant d'atteindre le serveur.
 
 | Commande | Effet |
 |---|---|
@@ -89,7 +89,7 @@ Réponse envoyée dans le **chat public**, délai fixe 800-1400ms + cooldown de 
 - **Position de l'overlay** — où dessiner le texte quand le style est `Overlay` : coins/centre haut/bas. Sans effet pour les autres styles.
 
 **Chat Games »**
-- **Modèle de commande** — équivalent au `commandTemplate` du JSON (`{response}`/`{timer}`).
+- **Modèle de commande** — équivalent au `commandTemplate` du JSON (`{question}`/`{response}`/`{timer}`/`{min | max}`, voir plus haut).
 - **Triggers Chat Games »** — zone de texte, une entrée par ligne au format `trigger|response|mindelay|maxdelay` (les deux derniers champs sont optionnels, défaut 1000/2000 si omis ou invalides).
 
 Le bouton **Sauvegarder** réécrit entièrement `autoresponder_questions.json` avec le contenu du menu — toute modification faite à la main dans le fichier pendant que l'écran est ouvert sera écrasée à la sauvegarde. **Annuler** ferme sans rien changer.

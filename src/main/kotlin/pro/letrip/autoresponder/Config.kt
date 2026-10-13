@@ -23,16 +23,48 @@ object Config {
 
     // Gson (standard, pas kotlinx-serialization) ignore les defauts de constructeur Kotlin pour
     // les champs absents du JSON (bypass du constructeur via Unsafe -> null/0 au lieu du defaut
-    // declare) : deserializer explicite pour rester robuste aux vieux fichiers incomplets.
+    // declare) : deserializers explicites pour rester robuste aux vieux fichiers incomplets.
+    // Les helpers opt* couvrent aussi les valeurs null explicites (JsonNull, dont asString/asLong
+    // leveraient une exception).
+    private fun com.google.gson.JsonObject.optString(name: String, default: String): String {
+        val el = get(name) ?: return default
+        if (el.isJsonNull) return default
+        return try { el.asString } catch (e: Exception) { default }
+    }
+
+    private fun com.google.gson.JsonObject.optLong(name: String, default: Long): Long {
+        val el = get(name) ?: return default
+        if (el.isJsonNull) return default
+        return try { el.asLong } catch (e: Exception) { default }
+    }
+
+    private fun com.google.gson.JsonObject.optBoolean(name: String, default: Boolean): Boolean {
+        val el = get(name) ?: return default
+        if (el.isJsonNull) return default
+        return try { el.asBoolean } catch (e: Exception) { default }
+    }
+
     private val gson: Gson = GsonBuilder()
         .setPrettyPrinting()
         .registerTypeAdapter(ValidationQuestion::class.java, JsonDeserializer { json, _, _ ->
             val obj = json.asJsonObject
             ValidationQuestion(
-                trigger = obj.get("trigger")?.asString.orEmpty(),
-                response = obj.get("response")?.asString.orEmpty(),
-                mindelay = obj.get("mindelay")?.asLong ?: 1000,
-                maxdelay = obj.get("maxdelay")?.asLong ?: 2000
+                trigger = obj.optString("trigger", ""),
+                response = obj.optString("response", ""),
+                mindelay = obj.optLong("mindelay", 1000),
+                maxdelay = obj.optLong("maxdelay", 2000)
+            )
+        })
+        .registerTypeAdapter(Responder::class.java, JsonDeserializer { json, _, _ ->
+            val obj = json.asJsonObject
+            Responder(
+                address = obj.optString("address", "*"),
+                pattern = obj.optString("pattern", ""),
+                message = obj.optString("message", ""),
+                minDelayInMilliseconds = obj.optLong("minDelayInMilliseconds", 100),
+                maxDelayInMilliseconds = obj.optLong("maxDelayInMilliseconds", 200),
+                forceDisableFormatter = obj.optBoolean("forceDisableFormatter", false),
+                regex = obj.optBoolean("regex", false)
             )
         })
         .create()
@@ -67,19 +99,28 @@ object Config {
     fun load() {
         Files.createDirectories(dir)
 
-        val words = readLines("words.txt")
-        val responders = gson.fromJson(read("responders.json"), Array<Responder>::class.java).toList()
-        val rawQuestions: Map<String, String> =
-            gson.fromJson(read("questions.json"), object : TypeToken<Map<String, String>>() {}.type)
+        val words = try { readLines("words.txt") } catch (e: Exception) { emptyList() }
+        // Chaque fichier parse avec repli sur le defaut : un JSON corrompu edite a la main ne
+        // doit pas crasher l'init ni /ar reload (avant : exception non geree -> crash).
+        val responders: List<Responder> = try {
+            gson.fromJson(read("responders.json"), Array<Responder>::class.java)?.toList() ?: emptyList()
+        } catch (e: Exception) { emptyList() }
+        val rawQuestions: Map<String, String> = try {
+            gson.fromJson(read("questions.json"), object : TypeToken<Map<String, String>>() {}.type) ?: emptyMap()
+        } catch (e: Exception) { emptyMap() }
 
-        var loaded = gson.fromJson(read("autoresponder_questions.json"), ValidationConfigFile::class.java)
-            ?: ValidationConfigFile()
+        var loaded: ValidationConfigFile = try {
+            gson.fromJson(read("autoresponder_questions.json"), ValidationConfigFile::class.java)
+                ?: ValidationConfigFile()
+        } catch (e: Exception) { ValidationConfigFile() }
         loaded = migrateLegacyFilesIfPresent(loaded)
         validationConfig = loaded
 
         val settings = readSettings()
         enabled = settings.enabled
-        baseCooldownMs = settings.baseCooldownMs
+        // Coerce ici aussi (pas seulement dans le setter) : un settings.json ecrit avec
+        // l'ancien defaut 500, ou edite a la main hors borne, revient dans [2000, 10000].
+        baseCooldownMs = settings.baseCooldownMs.coerceIn(2000, 10000)
         notificationStyle = settings.notificationStyle ?: NotificationStyle.CHAT
         overlayPosition = settings.overlayPosition ?: OverlayPosition.TOP_CENTER
 
@@ -165,7 +206,7 @@ object Config {
         saveSettings(currentSettings())
     }
 
-    /** Change le cooldown de base (ms), borne a [0, 10000] pour eviter une config absurde. */
+    /** Change le cooldown de base (ms), borne a [2000, 10000] pour eviter une config absurde. */
     fun setBaseCooldownMs(value: Long) {
         baseCooldownMs = value.coerceIn(2000, 10000)
         saveSettings(currentSettings())
@@ -189,7 +230,7 @@ object Config {
     // d'appliquer le defaut.
     private data class Settings(
         val enabled: Boolean = true,
-        val baseCooldownMs: Long = 500,
+        val baseCooldownMs: Long = 2000,
         val notificationStyle: NotificationStyle? = null,
         val overlayPosition: OverlayPosition? = null
     )
@@ -200,7 +241,8 @@ object Config {
             saveSettings(Settings())
             return Settings()
         }
-        return gson.fromJson(file.readText(), Settings::class.java) ?: Settings()
+        return try { gson.fromJson(file.readText(), Settings::class.java) ?: Settings() }
+        catch (e: Exception) { Settings() }
     }
 
     private fun saveSettings(settings: Settings) {
